@@ -72,7 +72,6 @@ func Login(c *fiber.Ctx) error {
 		Value:    token,
 		Expires:  time.Now().Add(time.Hour * 24), // 1 day jwt cookie
 		HTTPOnly: true,
-		Secure:   true,
 	}
 
 	c.Cookie(&cookie)
@@ -82,5 +81,40 @@ func Login(c *fiber.Ctx) error {
 }
 
 func LoginUser(c *fiber.Ctx) error {
+	cookie := c.Cookies("jwt-token")
+	token, err := jwt.ParseWithClaims(cookie, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
+		return []byte("secretkey"), nil
+	})
 
+	if err != nil {
+		c.Status(fiber.StatusUnauthorized)
+		return c.JSON(fiber.Map{
+			"message": "Unauthorized Access",
+		})
+	}
+
+	claims := token.Claims.(*jwt.StandardClaims)
+
+	var user models.User
+
+	database.DB.Where("ID=?", claims.Issuer).First(&user)
+
+	return c.JSON(user)
+
+}
+
+func Logout(c *fiber.Ctx) error {
+
+	cookie := fiber.Cookie{
+		Name:     "jwt-token",
+		Value:    "",
+		Expires:  time.Now().Add(-time.Hour),
+		HTTPOnly: true,
+	}
+
+	c.Cookie(&cookie)
+
+	return c.JSON(fiber.Map{
+		"message": "Successfully Logout",
+	})
 }
